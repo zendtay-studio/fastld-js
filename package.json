@@ -1,0 +1,69 @@
+{
+  "name": "fastld-js",
+  "version": "1.0.0",
+  "description": "Simple and Performant Language detection library using 2,3,4-gram matching. Pure JS, zero dependencies, offline-capable. Supports 130+ languages.",
+  "keywords": [
+    "language",
+    "language-detection",
+    "language-detector",
+    "language-identification",
+    "language-recognition",
+    "language-classifier",
+    "lang",
+    "langdetect",
+    "detect",
+    "detector",
+    "guess",
+    "language-guess",
+    "natural-language",
+    "nlp",
+    "text-language",
+    "text-classification",
+    "text-analysis",
+    "multilingual",
+    "linguistics",
+    "unicode",
+    "iso639",
+    "iso-639",
+    "n-gram",
+    "ngrams",
+    "bigram",
+    "trigram",
+    "quadgram",
+    "offline",
+    "pure-js",
+    "javascript",
+    "nodejs",
+    "fast",
+    "fastld",
+    "franc",
+    "tinyld",
+    "cld3",
+    "langdetect",
+    "lingua",
+    "lingua-language-detector",
+    "language-model"
+  ],
+  "license": "Apache-2.0",
+  "author": {
+    "name": "ZendTay Studio",
+    "email": "zendtaystudio@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zendtay-studio/fastld-js.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zendtay-studio/fastld-js/issues"
+  },
+  "homepage": "https://github.com/zendtay-studio/fastld-js#readme",
+  "type": "commonjs",
+  "main": "index.js",
+  "bin": {
+    "fastld": "./cli.js"
+  },
+  "scripts": {
+    "test": "node test.js",
+    "build": "node build.js"
+  }
+}
