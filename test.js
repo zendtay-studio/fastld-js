@@ -16,12 +16,17 @@
  * limitations under the License.
  */
 
+const assert = require('assert');
 const { detect, detectAll, getDatabaseInfo } = require('./index');
+const { tokenize } = require('./clear');
 const ISO_MAP = require('./iso');
 
 console.log("⚡ =================================================== ⚡");
 console.log("     COMPLETE ISO 639-1 LANGUAGE DETECTION TEST        ");
 console.log("⚡ =================================================== ⚡\n");
+
+assert.deepStrictEqual(tokenize('Hola!!! 123 😀😀 hola hola spam spam!!!'), ['hola', 'spam']);
+console.log('🧪 Tokenization regression test passed');
 
 const dbInfo = getDatabaseInfo();
 console.log(`📊 Database Info:`);
@@ -197,6 +202,22 @@ for (const [code, info] of Object.entries(ISO_MAP)) {
 }
 
 console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+// Compatibility smoke tests
+const filtered = detectAll('Hola mundo', { allow: ['es', 'en'] });
+if (!Array.isArray(filtered) || filtered.length === 0) {
+    throw new Error('detectAll should return filtered results for allow-list options');
+}
+if (filtered.some(item => !['es', 'en'].includes(item.code))) {
+    throw new Error('detectAll allow-list filtering changed the public contract');
+}
+
+const limited = detect('Hola mundo', 2);
+if (!Array.isArray(limited) || limited.length > 2) {
+    throw new Error('detect should return an array when given a numeric limit');
+}
+
+console.log("🧪 Compatibility checks passed");
 
 // Summary
 const precision = resultados.length > 0 ? (correctos / resultados.length) * 100 : 0;

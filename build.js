@@ -30,60 +30,66 @@ const CONFIG = {
 };
 
 const DIR = path.join(__dirname, 'languages');
+const ISO_DIR_RE = /^[a-z]{2}$/i;
 // ==================================
 
+function isValidLanguageDir(name) {
+    return ISO_DIR_RE.test(name);
+}
+
+function getTextFiles(dir) {
+    return fs.readdirSync(dir, { withFileTypes: true })
+        .filter(entry => entry.isFile() && entry.name.endsWith('.txt'))
+        .map(entry => path.join(dir, entry.name));
+}
+
 /**
- * Process a language: read all .txt files from its folder and build n-grams
+ * Process a language: read all .txt files from its folder, clean them with clear.js,
+ * and build n-grams from the resulting tokens.
  */
 function processLanguage(iso) {
     const isoDir = path.join(DIR, iso);
     if (!fs.existsSync(isoDir)) return null;
 
-    // Read all .txt files inside the folder
-    const files = fs.readdirSync(isoDir).filter(f => f.endsWith('.txt'));
+    const files = getTextFiles(isoDir);
     if (files.length === 0) return null;
 
-    const freqMap = new Map();
+    const freqMap = Object.create(null);
     let totalWordsProcessed = 0;
 
-    for (const file of files) {
-        const filePath = path.join(isoDir, file);
+    for (const filePath of files) {
         const content = fs.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n');
+        const tokens = tokenize(content);
 
-        for (const line of lines) {
-            const parts = line.trim().split(/\s+/);
-            if (parts.length < 2) continue;
-            const tokens = tokenize(parts[0]);
-            if (tokens.length === 0) continue;
-            const word = tokens[0];
+        for (let i = 0; i < tokens.length; i++) {
+            const word = tokens[i];
             if (word.length < CONFIG.MIN_WORD_LENGTH) continue;
 
             totalWordsProcessed++;
-            
-            // Full word as special n-gram
+
             if (CONFIG.INCLUDE_FULL_WORD) {
                 const fullGram = `#${word}`;
-                freqMap.set(fullGram, (freqMap.get(fullGram) || 0) + 1);
+                freqMap[fullGram] = (freqMap[fullGram] || 0) + 1;
             }
-            
-            // Normal n-grams
+
             for (const n of CONFIG.NGRAM_SIZES) {
-                for (let i = 0; i <= word.length - n; i++) {
-                    const gram = word.substring(i, i + n);
-                    freqMap.set(gram, (freqMap.get(gram) || 0) + 1);
+                const maxIndex = word.length - n;
+                if (maxIndex < 0) continue;
+                for (let j = 0; j <= maxIndex; j++) {
+                    const gram = word.substring(j, j + n);
+                    freqMap[gram] = (freqMap[gram] || 0) + 1;
                 }
             }
 
             if (totalWordsProcessed >= CONFIG.MAX_WORDS_PER_LANG) break;
         }
+
         if (totalWordsProcessed >= CONFIG.MAX_WORDS_PER_LANG) break;
     }
 
     if (totalWordsProcessed === 0) return null;
 
-    // Sort and take top N
-    const sorted = [...freqMap.entries()].sort((a, b) => b[1] - a[1]);
+    const sorted = Object.entries(freqMap).sort((a, b) => b[1] - a[1]);
     const topGrams = sorted.slice(0, CONFIG.TOP_NGRAMS_PER_LANG).map(([gram]) => gram);
     console.log(`   ✅ ${iso}: ${topGrams.length} n-grams (${totalWordsProcessed} words)`);
     return { iso, topGrams };
@@ -91,41 +97,34 @@ function processLanguage(iso) {
 
 async function setup() {
     console.log('🚀 Build using existing local files');
-    
-    // Check if languages folder exists
+
     if (!fs.existsSync(DIR)) {
         console.error('❌ Languages folder "languages/" does not exist');
         console.error('   First download corpora by running: node build.js --download');
         process.exit(1);
     }
 
-    // Get all languages (subfolders containing .txt files)
-    const targets = fs.readdirSync(DIR).filter(f => {
-        const fullPath = path.join(DIR, f);
-        if (!fs.statSync(fullPath).isDirectory()) return false;
-        const txtFiles = fs.readdirSync(fullPath).filter(file => file.endsWith('.txt'));
-        return txtFiles.length > 0;
-    });
+    const targets = fs.readdirSync(DIR, { withFileTypes: true })
+        .filter(entry => entry.isDirectory() && isValidLanguageDir(entry.name))
+        .map(entry => entry.name);
 
     if (targets.length === 0) {
-        console.error('❌ No .txt files found in any subfolder of languages/');
+        console.error('❌ No valid 2-letter language folders found under languages/');
         console.error('   First download corpora by running: node build.js --download');
         process.exit(1);
     }
 
     console.log(`📁 Processing ${targets.length} languages from local folder...\n`);
 
-    // Process languages
     const processed = [];
     for (const iso of targets) {
         const result = processLanguage(iso);
         if (result) processed.push(result);
     }
 
-    // Build inverted index
     console.log('\n🔗 Building inverted index...');
     const index = Object.create(null);
-    
+
     for (const item of processed) {
         const { iso, topGrams } = item;
         for (const gram of topGrams) {
@@ -134,18 +133,15 @@ async function setup() {
         }
     }
 
-    // Remove duplicates
     for (const gram in index) {
         if (index[gram].length > 1) {
             index[gram] = [...new Set(index[gram])];
         }
     }
 
-    // Statistics
     const totalNgrams = Object.keys(index).length;
     const avgLanguagesPerGram = (Object.values(index).reduce((sum, langs) => sum + langs.length, 0) / totalNgrams).toFixed(2);
 
-    // Save database
     const output = {
         __meta: {
             type: 'PURE_MATCH_ARRAY',
@@ -154,9 +150,8 @@ async function setup() {
             ngramCount: totalNgrams,
             avgLanguagesPerGram: parseFloat(avgLanguagesPerGram),
             config: CONFIG,
-            source: { 
+            source: {
                 type: 'local',
-                path: DIR,
                 generatedAt: new Date().toISOString()
             }
         },
@@ -164,8 +159,8 @@ async function setup() {
     };
 
     const outputPath = path.join(__dirname, 'data.json');
-    fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
-    
+    fs.writeFileSync(outputPath, JSON.stringify(output));
+
     console.log(`\n🔥 Database generated!`);
     console.log(`   📊 N-grams: ${totalNgrams.toLocaleString()}`);
     console.log(`   🌐 Languages: ${processed.length}`);
@@ -173,7 +168,6 @@ async function setup() {
     console.log(`   📦 Size: ${(fs.statSync(outputPath).size / 1024 / 1024).toFixed(2)} MB`);
 }
 
-// Run
 setup().catch(err => {
     console.error('❌ Error:', err.message);
     process.exit(1);

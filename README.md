@@ -1,100 +1,138 @@
-# (FastLd-JS) fastld-js
+# fastld-js
 
-A fast, lightweight, and high-performance language detection library based on n-gram matching (2-, 3-, and 4-grams). Written in pure JavaScript with zero dependencies, works completely offline. Supports **130+ languages.**
+fastld-js is a lightweight, offline language detection library for Node.js. It uses n-gram matching over a prebuilt index and does not depend on external services or packages.
 
-**GitHub:** [https://github.com/zendtay-studio/fastld-js](https://github.com/zendtay-studio/fastld-js)
+The library is designed for speed and simplicity. It is suitable for real-time classification, batch processing, content moderation, and other text analysis workflows.
 
-## ⚡ Performance
+Repository: https://github.com/zendtay-studio/fastld-js
 
-This library is optimized for speed. Using an in-memory indexed search (`PURE_MATCH_ARRAY`), detection takes only fractions of a millisecond per text, making it ideal for real-time and batch processing where analytical performance is critical.
+## Features
 
-## ⚠️ Known Limitation
+- Pure JavaScript, zero dependencies
+- Fully offline
+- Fast detection using an in-memory indexed database
+- Supports a broad set of languages
+- Compatible with CommonJS
+- Includes a CLI for quick testing and detection
 
-**Short texts** (e.g., one or two words) do not work reliably. The detection relies on statistical frequency of n-grams, so a medium to long text is required for accurate results.
-
----
-
-## 📦 Installation
+## Installation
 
 ```bash
 npm install fastld-js
 ```
 
-## 🚀 API Usage
+## API
 
-All functions are exposed from the main `index.js` file.
+The main entry point exports three functions:
 
-### 1. Detect main language (`detect`)
+- detect(text, options)
+- detectAll(text, options)
+- getDatabaseInfo()
 
-Returns the most probable language, or a limited number of top results.
+### detect
+
+Returns the most likely language for the provided text.
 
 ```javascript
 const { detect } = require('fastld-js');
 
-const text = "La familia salió de viaje hacia la playa el fin de semana pasado.";
-
-// Get the most likely language
+const text = 'La familia salió de viaje hacia la playa el fin de semana pasado.';
 const result = detect(text);
-console.log(result);
-/*
-Output:
-{
-  code: 'es',
-  code2: 'spa',
-  name: 'Spanish',
-  accuracy: 0.8543,
-  matches: 120,
-  total: 140
-}
-*/
 
-// Get top N results by passing a number
-const top3 = detect(text, 3);
-console.log(top3); // Array of the 3 most probable languages
+console.log(result);
 ```
 
-### 2. Get full breakdown (`detectAll`)
+Example output:
 
-Analyzes the text and returns a sorted array (highest to lowest accuracy) of all supported languages that had matches.
+```json
+{
+  "code": "es",
+  "code2": "spa",
+  "name": "Spanish",
+  "accuracy": 0.8543,
+  "matches": 120,
+  "total": 140
+}
+```
+
+You can also request the top N results by passing a number:
+
+```javascript
+const top3 = detect(text, 3);
+console.log(top3);
+```
+
+### detectAll
+
+Returns a ranked list of all matching languages.
 
 ```javascript
 const { detectAll } = require('fastld-js');
 
-const text = "The family went on a trip to the beach last weekend.";
-const allLanguages = detectAll(text);
+const text = 'The family went on a trip to the beach last weekend.';
+const results = detectAll(text);
 
-console.log(allLanguages[0]);
-/*
-Output:
-{
-  code: 'en',
-  code2: 'eng',
-  name: 'English',
-  accuracy: 0.8912,
-  matches: 135,
-  total: 151
-}
-*/
+console.log(results[0]);
 ```
 
-### 3. Database information (`getDatabaseInfo`)
+### getDatabaseInfo
 
-Returns technical details about the internally loaded data model.
+Returns metadata about the internal database.
 
 ```javascript
 const { getDatabaseInfo } = require('fastld-js');
 
-const dbInfo = getDatabaseInfo();
-console.log(dbInfo);
+const info = getDatabaseInfo();
+console.log(info);
 ```
 
-#### Current technical specifications:
+## Options
 
-- **Type:** `PURE_MATCH_ARRAY`
-- **Languages:** 130
-- **Total n-grams:** 254,497
-- **Config:** 2, 3, 4-grams, top 9000 per language
+Both detect and detectAll accept an options object with:
 
-## 📄 License
+- allow: array of language codes to restrict the result set
+- exclude: array of language codes to remove from the result set
 
-Apache 2.0 © [ZendTay Studio](mailto:zendtaystudio@gmail.com)
+Example:
+
+```javascript
+const { detectAll } = require('fastld-js');
+
+const results = detectAll('Bonjour le monde', {
+  allow: ['fr', 'en', 'es']
+});
+
+console.log(results);
+```
+
+## CLI
+
+The package includes a command-line interface.
+
+```bash
+npx fastld-js "Bonjour le monde"
+```
+
+Useful commands:
+
+```bash
+npx fastld-js --top 3 "Bonjour le monde"
+npx fastld-js --test
+npx fastld-js --version
+```
+
+## Build Process
+
+The database used by the library is generated from local language corpora under the languages folder.
+
+The build step reads language folders, applies the tokenizer, generates n-grams, and writes the compressed index to data.json.
+
+## Limitations
+
+Short texts may produce less reliable results. The detector works best on medium or long passages where enough n-gram evidence is available.
+
+## License
+
+Apache 2.0
+
+Copyright 2026 ZendTay Studio

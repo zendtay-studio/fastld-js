@@ -1,6 +1,6 @@
 {
   "name": "fastld-js",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Simple and Performant Language detection library using 2,3,4-gram matching. Pure JS, zero dependencies, offline-capable. Supports 130+ languages.",
   "keywords": [
     "language",

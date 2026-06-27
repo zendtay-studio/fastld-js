@@ -3,7 +3,8 @@
 
 # Development files
 node_modules
-languages/
+languages
+.git
 
 # IDE files
 .vscode/
