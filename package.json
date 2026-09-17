@@ -1,48 +1,32 @@
 {
   "name": "fastld-js",
-  "version": "1.0.2",
-  "description": "Simple and Performant Language detection library using 2,3,4-gram matching. Pure JS, zero dependencies, offline-capable. Supports 130+ languages.",
+  "version": "1.0.3",
+  "description": "Simple and Performant Language detection library using 3,4,5-gram matching. Pure JS, zero dependencies, offline-capable. Supports 115 languages.",
   "keywords": [
-    "language",
+    "language detection",
     "language-detection",
     "language-detector",
     "language-identification",
     "language-recognition",
     "language-classifier",
-    "lang",
     "langdetect",
-    "detect",
-    "detector",
-    "guess",
-    "language-guess",
-    "natural-language",
-    "nlp",
+    "detect language",
     "text-language",
-    "text-classification",
-    "text-analysis",
-    "multilingual",
-    "linguistics",
-    "unicode",
-    "iso639",
-    "iso-639",
+    "nlp",
+    "natural-language",
     "n-gram",
-    "ngrams",
-    "bigram",
     "trigram",
-    "quadgram",
+    "multilingual",
     "offline",
-    "pure-js",
+    "zero-dependency",
+    "typescript",
     "javascript",
     "nodejs",
     "fast",
     "fastld",
     "franc",
     "tinyld",
-    "cld3",
-    "langdetect",
-    "lingua",
-    "lingua-language-detector",
-    "language-model"
+    "whatlang"
   ],
   "license": "Apache-2.0",
   "author": {
@@ -58,9 +42,25 @@
   },
   "homepage": "https://github.com/zendtay-studio/fastld-js#readme",
   "type": "commonjs",
+  "modelVersion": 5,
   "main": "index.js",
+  "module": "index.mjs",
+  "types": "index.d.ts",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=12"
+  },
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.mjs",
+      "require": "./index.js",
+      "default": "./index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
-    "fastld-js": "./cli.js"
+    "fastld-js": "cli.js"
   },
   "scripts": {
     "test": "node test.js",

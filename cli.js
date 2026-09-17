@@ -16,37 +16,35 @@
  * limitations under the License.
  */
 
-const { detect } = require('./index');
-const packageJson = require('./package.json');
+const { detect, getDatabaseInfo } = require('./index');
+const pkg = require('./package.json');
 
-const args = process.argv.slice(2);
-const text = args.join(' ');
+const a = process.argv.slice(2);
+const t = a.join(' ');
 
-// Show version
-if (args.includes('-v') || args.includes('--version')) {
-    console.log(`fastld-js v${packageJson.version}`);
+if (a.includes('-v') || a.includes('--version')) {
+    console.log(`fastld-js v${pkg.version}`);
     process.exit(0);
 }
 
-// Run tests
-if (args.includes('-t') || args.includes('--test')) {
+if (a.includes('-t') || a.includes('--test')) {
     console.log('🧪 Running language detection tests...\n');
     require('./test.js');
     process.exit(0);
 }
 
-// Show help
-if (args.includes('-h') || args.includes('--help') || text === '') {
-    console.log(`
-🔤 fastld-js v${packageJson.version}
+if (a.includes('-i') || a.includes('--info') || a.includes('--db-info')) {
+    console.log(JSON.stringify(getDatabaseInfo(), null, 2));
+    process.exit(0);
+}
 
-USAGE:
-  fastld-js "text to detect"
-  fastld-js "text" --top <n>
-  fastld-js -t | --test
+if (a.includes('-h') || a.includes('--help') || t === '') {
+    console.log(`
+🔤 fastld-js v${pkg.version}
 
 OPTIONS:
   -v, --version     Show version number
+  -i, --info        Show database info (languages, ngrams, data version)
   -h, --help        Show this help
   -t, --test        Run complete ISO 639-1 language detection tests
   --top <n>         Show top N languages
@@ -59,19 +57,8 @@ EXAMPLES:
     process.exit(0);
 }
 
-// Detect top N
-let limit = null;
-const topIndex = args.indexOf('--top');
-if (topIndex !== -1 && args[topIndex + 1]) {
-    limit = parseInt(args[topIndex + 1], 10);
-}
+const ti = a.indexOf('--top');
+const n = ti !== -1 && a[ti + 1] ? parseInt(a[ti + 1], 10) : null;
 
-const result = detect(text, limit || {});
-
-if (limit && Array.isArray(result)) {
-    // For top N, show formatted array
-    console.log(JSON.stringify(result, null, 2));
-} else {
-    // For single result, show formatted object
-    console.log(JSON.stringify(result, null, 2));
-}
+// array when --top was given, single object otherwise.
+console.log(JSON.stringify(detect(t, n || {}), null, 2));
