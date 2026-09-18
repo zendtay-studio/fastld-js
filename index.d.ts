@@ -18,6 +18,11 @@
  * Type definitions for fastld-js.
  *
  * Pure-JS, zero-dependency language detection using 3/4/5-gram matching.
+ *
+ * @throws Any API call may throw an `Error` if the bundled language model
+ * fails to load (missing/corrupt `model.flt.gz`) or the internal hash index
+ * is found to be full or corrupt. Public inputs never throw — invalid text
+ * and options return the neutral result instead.
  */
 
 export interface DetectOptions {
@@ -32,6 +37,12 @@ export interface DetectOptions {
   minLen?: number;
   /** Alias for `minLen`. */
   minLength?: number;
+  /**
+   * `detect` only: return the top `count` results as an array. Only a
+   * non-negative integer is honored; negative, fractional or `NaN` values
+   * are ignored and a single result is returned.
+   */
+  count?: number;
 }
 
 export interface DetectResult {
@@ -47,6 +58,8 @@ export interface DetectResult {
   matches: number;
   /** Total number of grams extracted from the text. */
   total: number;
+  /** True when a language was detected; false for the undecided result. */
+  detect: boolean;
 }
 
 export interface LanguageInfo {
@@ -63,55 +76,85 @@ export interface DatabaseInfo {
   /** Monotonic dataset version, bumped on every `npm run build`. */
   dataVersion: number;
   languages: number;
+  /** Total number of n-grams in the model (3/4/5-grams, all together). */
   ngrams: number;
+  /** Total number of grams in the model (equals `ngrams`). */
+  modelNgrams: number;
   config: Record<string, unknown>;
   source: Record<string, unknown>;
   generated: string;
 }
 
-export interface ErrorResult extends Omit<DetectResult, 'code2' | 'name'> {
-  code: '';
-  code2: '';
-  name: '';
-  /** Neutral "could not decide" result object. */
-  undecided: DetectResult & { code: ''; code2: 'und'; name: 'Undecided' };
-}
-
 /**
- * Neutral result returned by `detect` when the input is blank, too short
- * (`minLen`), or otherwise undecidable. `ER.undecided` is that same object.
+ * Detect the language of `text`; returns a single result object. Undecidable
+ * input (blank, too short, `null`/non-string) yields the neutral result
+ * `{ code: '', code2: 'und', name: 'Undecided', accuracy: 0, matches: 0, total: 0 }`.
+ *
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it).
  */
-export declare const ER: ErrorResult;
-
-/** Detect the language of `text`; returns a single result object. */
 export function detect(text: string): DetectResult;
-/** Detect and return the top `count` candidates as an array. */
+/** Detect and return the top `count` candidates as an array. Only a non-negative
+ * integer is honored; negative, fractional or `NaN` counts are ignored and a
+ * single result object is returned. */
 export function detect(text: string, count: number): DetectResult[];
+/** Detect with options and return the top `count` candidates as an array
+ * (same validation as the numeric form: non-negative integer only). */
+export function detect(text: string, options: DetectOptions & { count: number }): DetectResult[];
 /** Detect with options; returns a single result object. */
 export function detect(text: string, options: DetectOptions): DetectResult;
-/** Detect with options and return the top `count` candidates as an array. */
-export function detect(text: string, options: DetectOptions & { count: number }): DetectResult[];
 
-/** Detect and return all ranked candidates as an array. */
+/** Detect and return all ranked candidates as an array.
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it). */
 export function detectAll(text: string, options?: DetectOptions): DetectResult[];
 
-/** Model metadata (languages, ngram count, config, generation time). */
+/** Model metadata (languages, ngram count, config, generation time).
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it). */
 export function getDatabaseInfo(): DatabaseInfo;
 
-/** Sorted array of all supported ISO 639-1 language codes. */
+/** Sorted array of all supported ISO 639-1 language codes.
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it). */
 export function supportedLanguages(): string[];
 
-/** Array of supported languages with code, three-letter code and name. */
+/** Array of supported languages with code, three-letter code and name.
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it). */
 export function languages(): LanguageInfo[];
 
 /**
  * True if `code` is supported. Matching is case-insensitive and accepts an
  * ISO 639-1 code, an ISO 639-2/3 three-letter code, or a language name.
+ *
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it).
  */
 export function hasLanguage(code: string): boolean;
 
-/** ISO 639-2/3 three-letter code for an ISO 639-1 code, or null. */
+/**
+ * ISO 639-2/3 three-letter code for a language. Accepts an ISO 639-1
+ * (2-letter) code, an ISO 639-2/3 (3-letter) code, or an English name as
+ * input, case-insensitively. Returns null when unknown.
+ *
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it).
+ */
 export function code3(code: string): string | null;
 
-/** English language name for an ISO 639-1 code, or null. */
+/**
+ * English language name for a language. Accepts an ISO 639-1 (2-letter)
+ * code, an ISO 639-2/3 (3-letter) code, or an English name as input,
+ * case-insensitively. Returns null when unknown.
+ *
+ * @throws If the bundled model is missing or corrupt (first call lazy-loads it).
+ */
 export function name(code: string): string | null;
+
+declare const fastld: {
+  detect: typeof detect;
+  detectAll: typeof detectAll;
+  getDatabaseInfo: typeof getDatabaseInfo;
+  supportedLanguages: typeof supportedLanguages;
+  languages: typeof languages;
+  hasLanguage: typeof hasLanguage;
+  code3: typeof code3;
+  name: typeof name;
+};
+
+/** Default export (ESM only) — the full module surface. */
+export default fastld;

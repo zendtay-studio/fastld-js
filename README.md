@@ -1,149 +1,354 @@
 # fastld-js
 
-fastld-js is a lightweight, offline language detection library for Node.js. It uses weighted n-gram matching over a compact prebuilt index and does not depend on external services or packages.
+Offline language detection for Node.js — **115 languages**, zero dependencies, ~0.7 ms per detection.
 
-The library is designed for speed and simplicity. It is suitable for real-time classification, batch processing, content moderation, and other text analysis workflows.
+[![npm version](https://img.shields.io/npm/v/fastld-js.svg)](https://www.npmjs.com/package/fastld-js)
+[![npm downloads](https://img.shields.io/npm/dm/fastld-js.svg)](https://www.npmjs.com/package/fastld-js)
+[![License: Apache-2.0](https://img.shields.io/npm/l/fastld-js.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+![Zero dependencies](https://img.shields.io/badge/zero%20dependencies-0%20deps-brightgreen)
 
-Repository: https://github.com/zendtay-studio/fastld-js
+```text
+┌─────────────────┐        ┌──────────────────────────┐
+│    input text   │ ──────►│    tokenize + normalize   │
+│  (string/blank) │        │   (fold → words → grams)  │
+└─────────────────┘        └───────────┬───────────────┘
+                                       │ n-grams (3/4/5)
+                                       ▼
+             ┌────────────────────────────────────┐
+             │      script prefilter (O(1))       │
+             │   writing system ──► candidate set │
+             └───────────┬────────────────────────┘
+                         │ candidate languages
+                         ▼
+             ┌────────────────────────────────────┐
+             │     weighted n-gram voting (3/4/5)  │
+             │     FNV-1a hash → inverted index    │
+             └───────────┬────────────────────────┘
+                         │ scores per language
+                         ▼
+             ┌────────────────────────────────────┐
+             │          ranked candidates          │
+             └───────────┬────────────────────────┘
+                         │
+                         ▼
+             ┌────────────────────────────────────┐
+             │     best match + accuracy           │
+             │   code, code2, name, matches,       │
+             │    total, accuracy, detect          │
+             └────────────────────────────────────┘
+```
 
-> **Are you viewing this from GitHub?** Clone the repository, enter the `fastld-js` folder and run `npm i . -g` to install the library (and its CLI) globally:
->
-> ```bash
-> git clone https://github.com/zendtay-studio/fastld-js.git
-> cd fastld-js
-> npm i . -g
-> ```
->
-> **Are you viewing this from npm?** Ignore the block above — `npm install fastld-js` is all you need.
+## Table of contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [CommonJS](#commonjs)
+  - [ESM](#esm)
+  - [Result object](#result-object)
+- [API reference](#api-reference)
+  - [detect](#detecttext-limitoroptions)
+  - [detectAll](#detectalltext-options)
+  - [Options](#options)
+  - [getDatabaseInfo](#getdatabaseinfo)
+  - [supportedLanguages](#supportedlanguages)
+  - [languages](#languages)
+  - [hasLanguage](#haslanguagecode) · [code3](#code3code) · [name](#namecode)
+- [CLI](#cli)
+- [License](#license)
 
 ## Features
 
-- **115 languages** (ISO 639-1 codes)
-- **~16.5 MB** in-memory model
-- **~90 ms** cold start (CLI spawn → result) · **~0.7 ms** per detection (measured on the real 115-language test corpus)
-- **Weighted IDF scoring** with script-based prefiltering
-- Pure JavaScript, zero dependencies
-- Fully offline
-- Compatible with CommonJS
-- Includes a CLI for quick testing and detection
+- **115 languages** (ISO 639-1 codes) with English names and ISO 639-2/3 codes
+- **~0.7 ms average per detection** (115-language test suite)
+- **Zero dependencies**, pure JavaScript, fully offline (model bundled, no network)
+- **CommonJS + ESM + TypeScript types** out of the box
+- **CLI binary** for scripts and quick testing
 
-## Quick Start
+> **Tip:** Because the model ships in the package, `detect` works on air-gapped
+> systems after the first require.
 
-```bash
-npm install fastld-js
-```
+## Requirements
 
-```javascript
-const { detect } = require('fastld-js');
-
-const result = detect('La vida es hermosa');
-console.log(result.name); // "Spanish"
-console.log(result.code); // "es"
-```
+| Component | Requirement |
+| --- | --- |
+| Node.js | `>= 12` (CommonJS and ESM) |
+| Network | Only needed for `npm install` — never at runtime |
 
 ## Installation
 
+Choose whichever source suits you: the **npm registry** (releases) or the **GitHub repository** (source). A local install exposes the CLI in your project's `node_modules/.bin`.
+
+**Option 1 — npm registry:**
+
 ```bash
 npm install fastld-js
 ```
 
-## API
+**Option 2 — GitHub repository:**
 
-The main entry point exports three functions:
+```bash
+git clone https://github.com/zendtay-studio/fastld-js.git && cd fastld-js && npm i -g .
+```
 
-- detect(text, limitOrOptions?)
-- detectAll(text, options?)
-- getDatabaseInfo()
+> **Note:** You can get the package from either source — npm or GitHub. The
+> GitHub route installs the current source globally and requires `git` installed.
 
-### detect(text, limitOrOptions?)
+## Usage
 
-Returns the most likely language for the provided text.
-
-The second argument is optional and can be **either** a number **or** an options object (never both):
-
-- `detect(text)` → a single result object
-- `detect(text, 3)` → an array with the top 3 results
-- `detect(text, { allow: [...] })` → a single result, restricted to the allowed languages
+### CommonJS
 
 ```javascript
 const { detect } = require('fastld-js');
 
-const result = detect('La vida es hermosa');
-console.log(result);
+detect('La vida es hermosa');
 ```
-
-Example output:
 
 ```json
 {
   "code": "es",
   "code2": "spa",
   "name": "Spanish",
-  "accuracy": 0.8543,
-  "matches": 120,
-  "total": 140
+  "accuracy": 1,
+  "matches": 17,
+  "total": 17,
+  "detect": true
 }
 ```
 
-Result fields:
-
-- `code`: ISO 639-1 two-letter code
-- `code2`: ISO 639-2 three-letter code
-- `name`: human-readable language name
-- `accuracy`: confidence score from 0 to 1 (matched n-gram ratio)
-- `matches`: number of n-grams that matched the model
-- `total`: total n-grams extracted from the text
-
-Pass a number as the second argument to request the top N results as an array:
+### ESM
 
 ```javascript
-const top3 = detect(text, 3);
-console.log(top3);
+import fastld, { detect, detectAll } from 'fastld-js';
+
+detect('La vida es hermosa');
 ```
 
-Pass an options object (see [Options](#options)) to filter the candidates, returning a single result:
+> **Note:** The ESM entry re-exports the CommonJS surface plus a `default`
+> export, so both `import fastld from 'fastld-js'` and named imports work.
+
+### Result object
+
+Every detection function returns a `DetectResult`:
+
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `code` | `string` | ISO 639-1 two-letter code; `''` when undecided |
+| `code2` | `string` | ISO 639-2/3 three-letter code; `'und'` when undecided |
+| `name` | `string` | English language name; `'Undecided'` when undecided |
+| `accuracy` | `number` | `matches / total` (0–1), rounded to 4 decimals |
+| `matches` | `number` | N-grams from the input that matched this language |
+| `total` | `number` | Total N-grams extracted from the input |
+| `detect` | `boolean` | `true` = language detected; `false` = undecided (equals `code !== ''`) |
+
+## API reference
+
+| Function | Description |
+| --- | --- |
+| [`detect(text[, limitOrOptions])`](#detecttext-limitoroptions) | Best-guess result, or top-n array |
+| [`detectAll(text[, options])`](#detectalltext-options) | Ranked list of every matching language |
+| [`getDatabaseInfo()`](#getdatabaseinfo) | Model metadata (languages, n-grams, version) |
+| [`supportedLanguages()`](#supportedlanguages) | All 115 ISO 639-1 codes |
+| [`languages()`](#languages) | All 115 `{ code, code2, name }` |
+| [`hasLanguage(code)`](#haslanguagecode) | Is a code/name supported? |
+| [`code3(code)`](#code3code) | ISO 639-2/3 code for a language |
+| [`name(code)`](#namecode) | English name for a language |
+
+### `detect(text[, limitOrOptions])`
+
+| Parameter | Type | Description |
+| --- | --- | --- |
+| `text` | `string` | Input text. Blank/non-string → undecided. |
+| `limitOrOptions` | `number \| object` | Optional. `n` (≥ 0 integer) → top-n array; `0` → `[]`; invalid values ignored. Or an [Options](#options) object. |
 
 ```javascript
 const { detect } = require('fastld-js');
 
-const only = detect('Bonjour le monde', {
-  allow: ['fr', 'en', 'es']
-});
-
-console.log(only); // { code: 'fr', ... }
+detect('Bonjour le monde');
 ```
 
-### detectAll(text, options?)
+```json
+{
+  "code": "fr",
+  "code2": "fra",
+  "name": "French",
+  "accuracy": 1,
+  "matches": 20,
+  "total": 20,
+  "detect": true
+}
+```
 
-Returns a ranked array of all matching languages.
+Undecidable input returns the neutral result — this is the only case with `detect: false`:
+
+```javascript
+detect('');
+```
+
+```json
+{
+  "code": "",
+  "code2": "und",
+  "name": "Undecided",
+  "accuracy": 0,
+  "matches": 0,
+  "total": 0,
+  "detect": false
+}
+```
+
+> **Note:** `total` comes from the input, `matches` from the model. A short or
+> low-entropy text can still match several languages — check `detect` before
+> trusting the top result.
+
+### `detectAll(text[, options])`
+
+Ranked list of every language with a positive score, best first. Accepts the same [Options](#options); undecidable input returns `[]`.
 
 ```javascript
 const { detectAll } = require('fastld-js');
 
-const results = detectAll('Bonjour le monde');
-console.log(results[0]);
-// → { code: 'fr', code2: 'fra', name: 'French', accuracy: 1, matches: 20, total: 20 }
+detectAll('Bonjour le monde');
 ```
 
-### getDatabaseInfo()
+```json
+[
+  {
+    "code": "fr",
+    "code2": "fra",
+    "name": "French",
+    "accuracy": 1,
+    "matches": 20,
+    "total": 20,
+    "detect": true
+  },
+  {
+    "code": "br",
+    "code2": "bre",
+    "name": "Breton",
+    "accuracy": 0.6,
+    "matches": 12,
+    "total": 20,
+    "detect": true
+  },
+  "..."
+]
+```
 
-Returns metadata about the loaded model.
+### Options
+
+Common to `detect` and `detectAll`. Codes are matched case-insensitively.
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `allow` | `string[]` | — | Only consider these ISO 639-1 codes. |
+| `exclude` | `string[]` | — | Never consider these ISO 639-1 codes. |
+| `minLen` / `minLength` | `number` | `0` | Minimum trimmed-input length before guessing; shorter input → undecided (`[]` for `detectAll`). |
+| `count` | `number` | — | `detect` only: top-`count` result array (same as the numeric limit). |
+
+**`allow`** — restrict candidates:
+
+```javascript
+detect('Bonjour le monde', { allow: ['fr', 'en', 'es'] });
+```
+
+```json
+{
+  "code": "fr",
+  "code2": "fra",
+  "name": "French",
+  "accuracy": 1,
+  "matches": 20,
+  "total": 20,
+  "detect": true
+}
+```
+
+**`exclude`** — forbid candidates (an `allow` list containing no supported code is ignored; `exclude` is applied last):
+
+```javascript
+detect('La vida es hermosa y llena de colores', { exclude: ['es'] });
+```
+
+```json
+{
+  "code": "gl",
+  "code2": "glg",
+  "name": "Galician",
+  "accuracy": 0.7568,
+  "matches": 28,
+  "total": 37,
+  "detect": true
+}
+```
+
+**`minLen`** — refuse short input:
+
+```javascript
+detect('hola', { minLen: 10 });
+```
+
+```json
+{
+  "code": "",
+  "code2": "und",
+  "name": "Undecided",
+  "accuracy": 0,
+  "matches": 0,
+  "total": 0,
+  "detect": false
+}
+```
+
+**`count`** — top-n array (alternative to `detect(text, n)`):
+
+```javascript
+detect('Bonjour le monde', { allow: ['fr', 'en'], count: 2 });
+```
+
+```json
+[
+  {
+    "code": "fr",
+    "code2": "fra",
+    "name": "French",
+    "accuracy": 1,
+    "matches": 20,
+    "total": 20,
+    "detect": true
+  },
+  {
+    "code": "en",
+    "code2": "eng",
+    "name": "English",
+    "accuracy": 0.5,
+    "matches": 10,
+    "total": 20,
+    "detect": true
+  }
+]
+```
+
+### `getDatabaseInfo()`
+
+Model metadata for the bundled build (values may change between releases):
 
 ```javascript
 const { getDatabaseInfo } = require('fastld-js');
 
-const info = getDatabaseInfo();
-console.log(info);
+getDatabaseInfo();
 ```
 
 ```json
 {
   "type": "WEIGHTED_IDF",
-  "dataVersion": 7,
+  "dataVersion": 5,
   "languages": 115,
-  "ngrams": 473818,
+  "ngrams": 658906,
+  "modelNgrams": 658906,
   "config": {
-    "MAX_WORDS_PER_LANG": 80000,
+    "MAX_WORDS_PER_LANG": 300000,
     "NGRAM_SIZES": [3, 4, 5],
     "MIN_WORD_LENGTH": 3,
     "TOP_NGRAMS_PER_LANG": 10000,
@@ -151,56 +356,176 @@ console.log(info);
     "TF_SCALE": 200,
     "WEIGHT_SCALE": 64
   },
-  "source": { "type": "local" },
-  "generated": "2026-09-11T16:06:31.187Z"
+  "source": {
+    "type": "local",
+    "generatedAt": "2026-09-14T17:28:02.838Z"
+  },
+  "generated": "2026-09-14T17:28:02.838Z"
 }
 ```
 
-### Options
+> **Note:** `dataVersion` mirrors the model build; the cache key is derived from
+> it, so an updated model never reuses a stale decompressed snapshot.
 
-Both `detect` and `detectAll` accept an options object as the last argument:
+### `supportedLanguages()`
 
-- `allow`: array of language codes to restrict the result set
-- `exclude`: array of language codes to remove from the result set
-
-Example:
+All 115 ISO 639-1 codes, sorted:
 
 ```javascript
-const { detectAll } = require('fastld-js');
+const { supportedLanguages } = require('fastld-js');
 
-const results = detectAll('Bonjour le monde', {
-  allow: ['fr', 'en', 'es']
-});
+supportedLanguages();
+```
 
-console.log(results);
+```json
+[
+  "ab",
+  "af",
+  "am",
+  "ar",
+  "ay",
+  "..."
+]
+```
+
+### `languages()`
+
+All 115 languages as `{ code, code2, name }`:
+
+```javascript
+const { languages } = require('fastld-js');
+
+languages();
+```
+
+```json
+[
+  { "code": "ab", "code2": "abk", "name": "Abkhazian" },
+  { "code": "af", "code2": "afr", "name": "Afrikaans" },
+  { "code": "am", "code2": "amh", "name": "Amharic" },
+  "..."
+]
+```
+
+### Lookups
+
+The three helpers accept an ISO 639-1 code, an ISO 639-2/3 code or an English
+name, case-insensitively. `hasLanguage` returns `true`/`false`; `code3` and
+`name` return the mapped value or `null` when unknown.
+
+**`hasLanguage(code)`**
+
+```javascript
+const { hasLanguage } = require('fastld-js');
+
+hasLanguage('es');        // 'es', 'spa' and 'spanish' all match
+hasLanguage('spa');
+hasLanguage('spanish');
+hasLanguage('xyz');
+```
+
+```json
+true
+true
+true
+false
+```
+
+**`code3(code)`**
+
+```javascript
+const { code3 } = require('fastld-js');
+
+code3('es');       // accepts 2-letter, 3-letter or name
+code3('spanish');
+code3('aa');
+```
+
+```json
+"spa"
+"spa"
+null
+```
+
+**`name(code)`**
+
+```javascript
+const { name } = require('fastld-js');
+
+name('es');
+name('orm');
+name('');
+```
+
+```json
+"Spanish"
+"Oromo"
+null
 ```
 
 ## CLI
 
-The package includes a command-line interface.
+The `fastld-js` binary mirrors the library 1:1. After a **global** install the
+command is available directly (no `npx` needed):
 
 ```bash
-npx fastld-js "Bonjour le monde"
+# Option 1 — npm registry:
+npm install -g fastld-js
+# Option 2 — GitHub repository:
+git clone https://github.com/zendtay-studio/fastld-js.git && cd fastld-js && npm i -g .
+
+fastld-js "La vida es hermosa"
 ```
 
-Useful commands:
+```json
+{
+  "code": "es",
+  "code2": "spa",
+  "name": "Spanish",
+  "accuracy": 1,
+  "matches": 17,
+  "total": 17,
+  "detect": true
+}
+```
+
+Without a global install, run it from your project via `npx`:
 
 ```bash
-npx fastld-js --top 3 "Bonjour le monde"
-npx fastld-js --info
-npx fastld-js --test
-npx fastld-js --help
-npx fastld-js --version
+npx fastld-js "La vida es hermosa"
 ```
 
-`--info` (also `-i`) prints the model metadata returned by `getDatabaseInfo()` — data version, language count, n-gram count and configuration. Use it to confirm which model build is loaded.
+### Command reference
 
-## Limitations
+| Command | Description |
+| --- | --- |
+| `fastld-js "<text>"` | Detect a language (JSON result) |
+| `fastld-js "<text>" --top <n>` | Top-`n` result array |
+| `fastld-js --info` | `getDatabaseInfo()` |
+| `fastld-js --languages` | `languages()` |
+| `fastld-js --supported` | `supportedLanguages()` |
+| `fastld-js --has <code>` | `true` / `false` |
+| `fastld-js --code3 <code>` | ISO 639-2/3 code or `null` |
+| `fastld-js --name <code>` | English name or `null` |
+| `fastld-js --test` | Run the 115-language suite |
+| `fastld-js --version` · `--help` | Version / help |
 
-The detector performs well even on short texts, but for the most reliable results it is recommended to provide a sentence or longer passage — the more n-gram evidence, the higher the confidence.
+**Short flags:**
+
+- `-i` (`--info`)
+- `-l` (`--languages`)
+- `-s` (`--supported`)
+- `-a` (`--has`)
+- `-c` (`--code3`)
+- `-n` (`--name`)
+- `-t` (`--test`)
+- `-v` (`--version`)
+- `-h` (`--help`)
+
+> **Note:** Value flags (`--top <n>`, `-a`, `-c`, `-n`) must be immediately
+> followed by their value, which is stripped from the analyzed text. Flagless
+> flags can appear before or after the text.
 
 ## License
 
-Apache 2.0
-
-Copyright 2026 ZendTay Studio
+Apache 2.0 · Copyright 2026 ZendTay Studio
