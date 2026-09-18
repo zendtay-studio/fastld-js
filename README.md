@@ -465,15 +465,12 @@ null
 
 ## CLI
 
-The `fastld-js` binary mirrors the library 1:1. After a **global** install the
-command is available directly (no `npx` needed):
+The `fastld-js` binary mirrors the library 1:1. After installing the package
+(see [Installation](#installation)), the command is available directly — an
+**npm registry** install exposes the global binary, and a local install runs it
+via `npx` (below):
 
 ```bash
-# Option 1 — npm registry:
-npm install -g fastld-js
-# Option 2 — GitHub repository:
-git clone https://github.com/zendtay-studio/fastld-js.git && cd fastld-js && npm i -g .
-
 fastld-js "La vida es hermosa"
 ```
 
@@ -489,7 +486,8 @@ fastld-js "La vida es hermosa"
 }
 ```
 
-Without a global install, run it from your project via `npx`:
+Without a global install, run it from your project via `npx` (the binary lives
+in your project's `node_modules/.bin`):
 
 ```bash
 npx fastld-js "La vida es hermosa"
